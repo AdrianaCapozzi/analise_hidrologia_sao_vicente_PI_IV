@@ -28,6 +28,9 @@ def get_eventos(data_ini=None, data_fim=None, bairro=None, tipo_evento=None):
         params.append(tipo_evento)
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
+    # Garante que o campo precipitacao_mm está presente
+    if 'precipitacao_mm' not in df.columns:
+        df['precipitacao_mm'] = None
     return df
 
 @app.route('/api/eventos', methods=['GET'])
