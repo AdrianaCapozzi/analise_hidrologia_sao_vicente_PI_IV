@@ -1,1 +1,141 @@
 <!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise Hidrológica São Vicente</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background: #181818; color: #eee; }
+        .filtros { margin-bottom: 20px; background: #222; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px #111; }
+        .grafico { background: #222; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px #111; }
+        label { margin-right: 10px; }
+        select, input { margin-right: 20px; background: #333; color: #eee; border: 1px solid #444; }
+        button { background: #0077b6; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #00b4d8; }
+    </style>
+</head>
+<body>
+    <h1>Análise Hidrológica - São Vicente/SP</h1>
+    <div class="filtros">
+        <label for="data_ini">Data inicial:</label>
+        <input type="date" id="data_ini">
+        <label for="data_fim">Data final:</label>
+        <input type="date" id="data_fim">
+        <label for="bairro">Bairro:</label>
+        <select id="bairro"><option value="">Todos</option></select>
+        <label for="tipo_evento">Tipo de evento:</label>
+        <select id="tipo_evento">
+            <option value="">Todos</option>
+            <option value="chuva">Chuva</option>
+            <option value="maré">Maré</option>
+            <option value="rio">Rio</option>
+        </select>
+        <button onclick="carregarDados()">Filtrar</button>
+    </div>
+    <div class="grafico">
+        <div id="grafico_barras" style="height:400px;"></div>
+        <div id="grafico_linha" style="height:400px; margin-top:40px;"></div>
+        <div id="grafico_boxplot" style="height:400px; margin-top:40px;"></div>
+    </div>
+    <script>
+    async function carregarBairros() {
+        const res = await fetch('/api/bairros');
+        const bairros = await res.json();
+        const select = document.getElementById('bairro');
+        bairros.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b.bairro;
+            opt.textContent = b.bairro + ' (' + b.regiao + ')';
+            select.appendChild(opt);
+        });
+    }
+    async function carregarDados() {
+        const data_ini = document.getElementById('data_ini').value;
+        const data_fim = document.getElementById('data_fim').value;
+        const bairro = document.getElementById('bairro').value;
+        const tipo_evento = document.getElementById('tipo_evento').value;
+        let url = `/api/eventos?`;
+        if (data_ini) url += `data_ini=${data_ini}&`;
+        if (data_fim) url += `data_fim=${data_fim}&`;
+        if (bairro) url += `bairro=${bairro}&`;
+        if (tipo_evento) url += `tipo_evento=${tipo_evento}&`;
+        const res = await fetch(url);
+        const dados = await res.json();
+        desenharGraficos(dados);
+    }
+    function desenharGraficos(dados) {
+        // Gráfico de barras: eventos por bairro (cores diferentes)
+        const bairros = {};
+        dados.forEach(e => {
+            bairros[e.bairro] = (bairros[e.bairro] || 0) + 1;
+        });
+        const bairroNomes = Object.keys(bairros);
+        // Gerar cores distintas
+        const cores = bairroNomes.map((_, i) => `hsl(${i * 360 / bairroNomes.length}, 70%, 50%)`);
+        const barData = [{
+            x: bairroNomes,
+            y: Object.values(bairros),
+            type: 'bar',
+            marker: { color: cores },
+        }];
+        Plotly.newPlot('grafico_barras', barData, {
+            title: 'Eventos por Bairro',
+            paper_bgcolor: '#222',
+            plot_bgcolor: '#222',
+            font: { color: '#eee' }
+        });
+
+        // Gráfico de linha: eventos ao longo do tempo com legenda
+        const porData = {};
+        dados.forEach(e => {
+            porData[e.data] = (porData[e.data] || 0) + 1;
+        });
+        const datas = Object.keys(porData).sort();
+        const linhaData = [{
+            x: datas,
+            y: datas.map(d => porData[d]),
+            type: 'scatter',
+            mode: 'lines+markers',
+            marker: { color: '#00b4d8' },
+            name: 'Quantidade de eventos',
+        }];
+        Plotly.newPlot('grafico_linha', linhaData, {
+            title: 'Eventos ao Longo do Tempo',
+            paper_bgcolor: '#222',
+            plot_bgcolor: '#222',
+            font: { color: '#eee' },
+            legend: { bgcolor: '#222', font: { color: '#eee' } },
+            xaxis: { title: 'Data' },
+            yaxis: { title: 'Quantidade de eventos' },
+            annotations: [{
+                text: 'Passe o mouse para ver a quantidade de eventos por dia',
+                xref: 'paper', yref: 'paper', x: 0, y: 1.1, showarrow: false, font: { color: '#eee' }
+            }]
+        });
+
+        // Gráfico de boxplot para outliers de eventos por bairro
+        // Agrupa por bairro: cada bairro é uma amostra de quantidade de eventos por dia
+        const bairroDias = {};
+        dados.forEach(e => {
+            if (!bairroDias[e.bairro]) bairroDias[e.bairro] = {};
+            bairroDias[e.bairro][e.data] = (bairroDias[e.bairro][e.data] || 0) + 1;
+        });
+        const boxData = bairroNomes.map((b, i) => ({
+            y: Object.values(bairroDias[b]),
+            name: b,
+            type: 'box',
+            marker: { color: cores[i] },
+            boxpoints: 'outliers',
+        }));
+        Plotly.newPlot('grafico_boxplot', boxData, {
+            title: 'Distribuição de Eventos por Bairro (Boxplot - Outliers)',
+            paper_bgcolor: '#222',
+            plot_bgcolor: '#222',
+            font: { color: '#eee' }
+        });
+    }
+    carregarBairros();
+    carregarDados();
+    </script>
+</body>
+</html>
