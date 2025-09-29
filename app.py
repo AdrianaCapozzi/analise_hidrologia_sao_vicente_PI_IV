@@ -19,7 +19,7 @@ def get_eventos(data_ini=None, data_fim=None, bairro=None, tipo_evento=None):
         params.append(data_ini)
     if data_fim:
         query += " AND data <= ?"
-        params.append(data_fim)
+        params.append(data_fim) 
     if bairro:
         query += " AND bairro = ?"
         params.append(bairro)
