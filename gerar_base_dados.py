@@ -4,7 +4,6 @@ from faker import Faker
 import random
 from datetime import datetime, timedelta
 
-# Bairros de São Vicente
 bairros_insular = [
     'Centro', 'Gonzaguinha', 'Itararé', 'Boa Vista', 'Parque Bitaru', 'Vila Valença',
     'Vila Margarida', 'Vila Voturuá', 'Catiapoã', 'Jockey Clube', 'Vila São Jorge', 'Vila Ponte Nova'
